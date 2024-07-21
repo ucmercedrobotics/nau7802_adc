@@ -6,6 +6,7 @@ import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from std_msgs.msg import Int32
+from std_srvs.srv import Trigger
 from geometry_msgs.msg import Wrench, WrenchStamped
 
 class Nau7802Node(Node):
@@ -45,7 +46,20 @@ class Nau7802Node(Node):
             f'channel {self.nau7802.channel} ready'
         )
 
-    def zero_channel(self, channel=1) -> None:
+        self._zero_channel_service = self.create_service(
+            srv_type=Trigger,
+            srv_name="nau7802_tare",
+            callback=self.zero_channel_service_callback)
+
+    def zero_channel_service_callback(self, _, response):
+        if self.zero_channel(channel=1):
+            response.success = True
+            return response
+        else:
+            response.success = False
+            return response
+
+    def zero_channel(self, channel=1):
         """Initiate internal + external calibration for current channel.
 
         The NAU7802 can perform an internal and external (offset) calibration.
@@ -65,6 +79,8 @@ class Nau7802Node(Node):
             f'{self.nau7802.calibrate(mode="OFFSET")}'
         )
         self.get_logger().info(f'...channel {self.nau7802.channel} zeroed')
+
+        return True
 
     def read_raw_value_avg(self, samples=2) -> int:
         """Read and average consecutive raw sample values. 
